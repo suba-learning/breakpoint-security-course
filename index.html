@@ -1,0 +1,1633 @@
+<title>Breakpoint</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  /* Layout: fixed left syllabus rail + scrolling content pane; rail collapses to an off-canvas drawer under 860px.
+     Palette: cool blue-grey neutrals, teal primary, amber=payload/caution, red=critical, green=defense. */
+  :root {
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --surface-2: #eceff4;
+    --fg: #1a2230;
+    --muted: #586274;
+    --faint: #8a93a3;
+    --border: #d8dee7;
+    --accent: #0d7d88;
+    --accent-ink: #0a5d66;
+    --accent-weak: #d6ecee;
+    --danger: #c23a2b;
+    --danger-weak: #f6ddd9;
+    --warn: #9a6a06;
+    --warn-weak: #f6e9cc;
+    --ok: #27823f;
+    --ok-weak: #d7ecdc;
+    --code-bg: #10161f;
+    --code-fg: #e4e9f0;
+    --code-faint: #7f8aa0;
+    --code-str: #7fd6a6;
+    --code-key: #6fb6ff;
+    --code-pay: #ffcc66;
+    --shadow: 0 1px 2px rgba(20,30,48,.06), 0 6px 20px rgba(20,30,48,.06);
+    --sans: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d1218;
+      --surface: #141b24;
+      --surface-2: #1b232e;
+      --fg: #e6ebf2;
+      --muted: #9aa5b5;
+      --faint: #6b7688;
+      --border: #28323f;
+      --accent: #34c4bd;
+      --accent-ink: #5fd6cf;
+      --accent-weak: #103037;
+      --danger: #ff6f61;
+      --danger-weak: #3a1f1d;
+      --warn: #e2ac4e;
+      --warn-weak: #392d13;
+      --ok: #5ac978;
+      --ok-weak: #15301d;
+      --code-bg: #0a0f16;
+      --code-fg: #e4e9f0;
+      --code-faint: #6b7688;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d1218;
+    --surface: #141b24;
+    --surface-2: #1b232e;
+    --fg: #e6ebf2;
+    --muted: #9aa5b5;
+    --faint: #6b7688;
+    --border: #28323f;
+    --accent: #34c4bd;
+    --accent-ink: #5fd6cf;
+    --accent-weak: #103037;
+    --danger: #ff6f61;
+    --danger-weak: #3a1f1d;
+    --warn: #e2ac4e;
+    --warn-weak: #392d13;
+    --ok: #5ac978;
+    --ok-weak: #15301d;
+    --code-bg: #0a0f16;
+    --code-fg: #e4e9f0;
+    --code-faint: #6b7688;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--sans); line-height: 1.6; }
+  h1,h2,h3,h4 { text-wrap: balance; line-height: 1.2; margin: 0; }
+  a { color: var(--accent-ink); }
+  code, kbd { font-family: var(--mono); }
+
+  /* ---------- shell ---------- */
+  .shell { display: flex; min-height: 100%; }
+
+  /* ---------- sidebar ---------- */
+  .rail {
+    width: 272px; flex: none; background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: sticky; top: env(safe-area-inset-top, 0px);
+    height: 100vh; height: 100dvh;
+  }
+  .rail-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--border); }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark {
+    width: 30px; height: 30px; border-radius: 7px; flex: none;
+    background: var(--accent); color: #fff; display: grid; place-items: center;
+    font-family: var(--mono); font-weight: 600; font-size: 17px;
+  }
+  .brand .name { font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
+  .brand .name small { display: block; font-size: 11px; font-weight: 500; color: var(--faint); letter-spacing: .04em; text-transform: uppercase; }
+
+  .progress-wrap { margin-top: 14px; }
+  .progress-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .progress-top b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .progress-track { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+  .progress-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 999px; transition: width .35s ease; }
+
+  .nav { overflow-y: auto; padding: 10px 10px 24px; flex: 1; }
+  .nav-group { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--faint); padding: 14px 10px 6px; font-weight: 600; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 8px 10px; border-radius: 8px; border: 0; background: none; cursor: pointer;
+    font-family: var(--sans); font-size: 13.5px; color: var(--muted); text-align: left; line-height: 1.3;
+  }
+  .nav-item:hover { background: var(--surface-2); color: var(--fg); }
+  .nav-item.active { background: var(--accent-weak); color: var(--accent-ink); font-weight: 600; }
+  .nav-item .ix {
+    font-family: var(--mono); font-size: 11px; width: 22px; height: 22px; flex: none;
+    border-radius: 6px; border: 1px solid var(--border); display: grid; place-items: center; color: var(--faint);
+  }
+  .nav-item.active .ix { border-color: var(--accent); color: var(--accent-ink); }
+  .nav-item .lbl { flex: 1; min-width: 0; }
+  .nav-item .chk { font-size: 13px; color: var(--ok); opacity: 0; }
+  .nav-item.done .chk { opacity: 1; }
+  .nav-item.done .ix { background: var(--ok-weak); border-color: var(--ok); color: var(--ok); }
+
+  /* ---------- content ---------- */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    display: none; align-items: center; gap: 12px;
+    padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top, 0px));
+    border-bottom: 1px solid var(--border); background: var(--surface);
+    position: sticky; top: 0; z-index: 30;
+  }
+  .icon-btn {
+    width: 38px; height: 38px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--fg); cursor: pointer; display: grid; place-items: center; flex: none; font-size: 16px;
+  }
+  .icon-btn:hover { background: var(--surface-2); }
+  .topbar .brand .name { font-size: 15px; }
+
+  .content { padding: 40px clamp(20px, 5vw, 64px); padding-block: 40px; max-width: 860px; width: 100%; margin: 0 auto; }
+  .content > section { animation: fade .3s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .content > section, .content > section * { animation: none !important; } }
+
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 600; }
+  .page-title { font-size: clamp(26px, 4.5vw, 38px); font-weight: 700; letter-spacing: -.02em; margin: 10px 0 0; }
+  .lede { font-size: 17px; color: var(--muted); margin: 14px 0 0; max-width: 62ch; }
+  .content h2 { font-size: 21px; font-weight: 600; letter-spacing: -.01em; margin: 38px 0 0; }
+  .content h3 { font-size: 16px; font-weight: 600; margin: 26px 0 0; }
+  .content p { margin: 12px 0 0; max-width: 66ch; }
+  .content ul, .content ol { margin: 12px 0 0; padding-left: 22px; max-width: 66ch; }
+  .content li { margin: 6px 0; }
+  .content li::marker { color: var(--faint); }
+  .content strong { font-weight: 600; }
+  .divider { height: 1px; background: var(--border); border: 0; margin: 34px 0; }
+
+  .term { border-bottom: 1px dashed var(--faint); cursor: help; }
+
+  /* callout cards */
+  .box { border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 20px 0 0; background: var(--surface); }
+  .box .box-h { font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; letter-spacing: .01em; }
+  .box .box-h .tag { font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; padding: 2px 7px; border-radius: 5px; }
+  .box p:first-of-type { margin-top: 8px; }
+  .box.qa { background: var(--accent-weak); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+  .box.qa .tag { background: var(--accent); color: #fff; }
+  .box.def { background: var(--ok-weak); border-color: color-mix(in srgb, var(--ok) 35%, var(--border)); }
+  .box.def .tag { background: var(--ok); color: #fff; }
+  .box.warn-box { background: var(--warn-weak); border-color: color-mix(in srgb, var(--warn) 40%, var(--border)); }
+  .box.warn-box .tag { background: var(--warn); color: #fff; }
+  .box.danger-box { background: var(--danger-weak); border-color: color-mix(in srgb, var(--danger) 35%, var(--border)); }
+  .box.danger-box .tag { background: var(--danger); color: #fff; }
+
+  /* code */
+  pre { margin: 16px 0 0; background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; border: 1px solid rgba(255,255,255,.05); }
+  pre code { font-family: var(--mono); }
+  :not(pre) > code { background: var(--surface-2); padding: 1.5px 6px; border-radius: 5px; font-size: .9em; }
+  .tok-key { color: var(--code-key); }
+  .tok-str { color: var(--code-str); }
+  .tok-pay { color: var(--code-pay); font-weight: 600; }
+  .tok-com { color: var(--code-faint); font-style: italic; }
+  .code-head { display: flex; justify-content: space-between; align-items: center; margin: 18px 0 -8px; }
+  .code-head .fname { font-family: var(--mono); font-size: 11.5px; color: var(--faint); }
+  .copy-btn { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 6px; padding: 4px 9px; cursor: pointer; }
+  .copy-btn:hover { color: var(--fg); background: var(--surface-2); }
+
+  /* buttons */
+  .btn { font-family: var(--sans); font-size: 14px; font-weight: 500; border-radius: 9px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--fg); }
+  .btn:hover { background: var(--surface-2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { background: var(--accent-ink); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+  .btn.lab { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); color: var(--accent-ink); background: var(--accent-weak); font-weight: 600; }
+  .btn.lab::before { content: "▸"; margin-right: 7px; }
+
+  /* quiz */
+  .quiz { border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin: 28px 0 0; background: var(--surface); }
+  .quiz .q { font-weight: 600; font-size: 14.5px; }
+  .quiz .opts { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+  .quiz .opt { text-align: left; border: 1px solid var(--border); border-radius: 9px; padding: 11px 14px; background: var(--surface); cursor: pointer; font-family: var(--sans); font-size: 13.5px; color: var(--fg); display: flex; gap: 10px; align-items: flex-start; }
+  .quiz .opt:hover { border-color: var(--accent); }
+  .quiz .opt .k { font-family: var(--mono); font-size: 11px; color: var(--faint); border: 1px solid var(--border); border-radius: 5px; width: 20px; height: 20px; flex: none; display: grid; place-items: center; }
+  .quiz .opt.correct { background: var(--ok-weak); border-color: var(--ok); }
+  .quiz .opt.correct .k { background: var(--ok); color: #fff; border-color: var(--ok); }
+  .quiz .opt.wrong { background: var(--danger-weak); border-color: var(--danger); }
+  .quiz .opt.wrong .k { background: var(--danger); color: #fff; border-color: var(--danger); }
+  .quiz .fb { margin-top: 14px; font-size: 13.5px; color: var(--muted); display: none; }
+  .quiz .fb.show { display: block; }
+  .quiz .fb b { color: var(--fg); }
+
+  /* mark complete */
+  .complete-row { display: flex; align-items: center; gap: 14px; margin-top: 36px; padding-top: 24px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .complete-row .done-flag { color: var(--ok); font-weight: 600; font-size: 14px; display: none; align-items: center; gap: 7px; }
+  .complete-row.is-done .done-flag { display: flex; }
+  .complete-row.is-done .complete-btn { display: none; }
+
+  /* ---------- labs ---------- */
+  .lab { border: 1px solid var(--border); border-radius: 14px; margin: 26px 0 0; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+  .lab-head { padding: 16px 18px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+  .lab-head h3 { font-size: 16px; }
+  .lab-head .sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .lab-head .vuln-badge { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; padding: 3px 8px; border-radius: 5px; background: var(--danger-weak); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); float: right; }
+  .lab-body { padding: 18px; }
+  .lab-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 620px) { .lab-grid { grid-template-columns: 1fr; } }
+  .field { margin-top: 12px; }
+  .field:first-child { margin-top: 0; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 6px; font-family: var(--mono); letter-spacing: .02em; }
+  .field input, .field textarea, .field select {
+    width: 100%; font-family: var(--mono); font-size: 13px; padding: 9px 11px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--fg); resize: vertical;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .lab-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-family: var(--mono); margin-left: auto; cursor: pointer; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--ok); }
+  .payload-chip { font-family: var(--mono); font-size: 11.5px; padding: 5px 9px; border-radius: 6px; border: 1px dashed color-mix(in srgb, var(--warn) 50%, var(--border)); background: var(--warn-weak); color: var(--warn); cursor: pointer; }
+  .payload-chip:hover { border-style: solid; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; align-items: center; }
+  .chip-row .chip-lbl { font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+  .term-out { font-family: var(--mono); font-size: 12.5px; background: var(--code-bg); color: var(--code-fg); border-radius: 10px; padding: 14px 16px; margin-top: 16px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; min-height: 48px; }
+  .term-out .ok { color: var(--code-str); }
+  .term-out .bad { color: #ff8b7e; }
+  .term-out .dim { color: var(--code-faint); }
+  .term-out .pay { color: var(--code-pay); }
+  .term-out .key { color: var(--code-key); }
+  .verdict { margin-top: 14px; border-radius: 10px; padding: 12px 14px; font-size: 13.5px; font-weight: 500; display: none; }
+  .verdict.show { display: block; }
+  .verdict.breached { background: var(--danger-weak); color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); }
+  .verdict.safe { background: var(--ok-weak); color: var(--ok); border: 1px solid color-mix(in srgb, var(--ok) 40%, transparent); }
+  .verdict.neutral { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* resources */
+  .res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; margin-top: 22px; }
+  .res-card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; background: var(--surface); text-decoration: none; color: inherit; display: block; }
+  .res-card:hover { border-color: var(--accent); box-shadow: var(--shadow); }
+  .res-card .rc-tag { font-family: var(--mono); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent-ink); font-weight: 600; }
+  .res-card .rc-title { font-weight: 600; font-size: 15px; margin-top: 6px; }
+  .res-card .rc-desc { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.5; }
+  .res-card .rc-url { font-family: var(--mono); font-size: 11px; color: var(--faint); margin-top: 10px; word-break: break-all; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; padding: 4px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+
+  /* home hero */
+  .hero-card { border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-top: 26px; background: var(--surface); box-shadow: var(--shadow); }
+  .path-list { list-style: none; padding: 0; margin: 18px 0 0; display: flex; flex-direction: column; gap: 2px; }
+  .path-list li { display: flex; gap: 14px; padding: 12px 0; border-top: 1px solid var(--border); align-items: baseline; }
+  .path-list li:first-child { border-top: 0; }
+  .path-list .n { font-family: var(--mono); font-size: 12px; color: var(--accent-ink); font-weight: 600; width: 26px; flex: none; }
+  .path-list .t { font-weight: 600; font-size: 14.5px; }
+  .path-list .d { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .stat-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  .stat { border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; background: var(--surface-2); }
+  .stat .v { font-family: var(--mono); font-weight: 600; font-size: 18px; }
+  .stat .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+
+  .scrim { display: none; }
+  @media (max-width: 860px) {
+    .rail { position: fixed; z-index: 50; left: 0; top: 0; height: 100%; transform: translateX(-100%); transition: transform .25s ease; box-shadow: var(--shadow); }
+    .rail.open { transform: none; }
+    .topbar { display: flex; }
+    .scrim.open { display: block; position: fixed; inset: 0; background: rgba(10,14,20,.5); z-index: 40; }
+    .content { padding-top: 26px; }
+  }
+</style>
+
+<div class="shell">
+  <aside class="rail" id="rail">
+    <div class="rail-head">
+      <div class="brand">
+        <div class="mark">&gt;_</div>
+        <div class="name">Breakpoint<small>Security testing, hands-on</small></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-top"><span>Course progress</span><span><b id="pctText">0%</b></span></div>
+        <div class="progress-track"><div class="progress-fill" id="pctFill"></div></div>
+      </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+
+  <div class="main">
+    <div class="topbar">
+      <button class="icon-btn" id="menuBtn" aria-label="Open menu">☰</button>
+      <div class="brand"><div class="mark">&gt;_</div><div class="name">Breakpoint</div></div>
+      <button class="icon-btn" id="themeBtn" aria-label="Toggle theme" style="margin-left:auto">◐</button>
+    </div>
+    <div class="content" id="content"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Breakpoint — a browser course for security testing.
+   No external runtime: every lab is a deterministic simulation
+   of a vulnerable endpoint. Nothing here talks to a network.
+   ============================================================ */
+
+/* ---------- syllabus model ---------- */
+const CHAPTERS = [
+  { id:"ch0", ix:"00", label:"The Security Mindset", group:"Foundations" },
+  { id:"ch1", ix:"01", label:"The Web, Attacker's View", group:"Foundations" },
+  { id:"ch2", ix:"02", label:"Broken Access Control", group:"The Big Vulnerabilities" },
+  { id:"ch3", ix:"03", label:"SQL Injection", group:"The Big Vulnerabilities" },
+  { id:"ch4", ix:"04", label:"Cross-Site Scripting (XSS)", group:"The Big Vulnerabilities" },
+  { id:"ch5", ix:"05", label:"Auth & Session Failures", group:"The Big Vulnerabilities" },
+  { id:"ch6", ix:"06", label:"The Rest of the Top 10", group:"The Big Vulnerabilities" },
+  { id:"ch7", ix:"07", label:"API Security Testing", group:"Your Specialty" },
+  { id:"ch8", ix:"08", label:"Method & Reporting", group:"Doing the Work" },
+  { id:"ch9", ix:"09", label:"Your Lab & Next Steps", group:"Doing the Work" },
+];
+const EXTRAS = [
+  { id:"lab", ix:"▸", label:"Practice Lab", group:"Hands-On" },
+  { id:"resources", ix:"✦", label:"Resources", group:"Hands-On" },
+];
+const TOTAL = CHAPTERS.length;
+
+/* ---------- persistence ---------- */
+const PKEY = "breakpoint.progress.v1";
+const TKEY = "breakpoint.theme.v1";
+function loadDone(){ try { return new Set(JSON.parse(localStorage.getItem(PKEY) || "[]")); } catch { return new Set(); } }
+function saveDone(s){ try { localStorage.setItem(PKEY, JSON.stringify([...s])); } catch {} }
+let done = loadDone();
+
+/* ---------- escape helper ---------- */
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ============================================================
+   CONTENT
+   Each chapter returns an HTML string. Keeping copy in JS keeps
+   the single-file page tidy and lets the nav/quiz/lab wiring
+   stay generic.
+   ============================================================ */
+
+const C = {};
+
+C.home = () => `
+<section>
+  <div class="eyebrow">Breakpoint</div>
+  <h1 class="page-title">Learn to break software on purpose — so you can help fix it.</h1>
+  <p class="lede">A hands-on course in security testing for someone who already knows how to test. You bring the QA instincts; this fills in the attacker's mindset, the vocabulary, and the techniques — with live labs where you type real payloads and watch them land.</p>
+
+  <div class="stat-row">
+    <div class="stat"><div class="v">10</div><div class="l">Chapters</div></div>
+    <div class="stat"><div class="v">4</div><div class="l">Live labs</div></div>
+    <div class="stat"><div class="v">0</div><div class="l">Setup needed</div></div>
+  </div>
+
+  <div class="hero-card">
+    <div class="eyebrow">The path</div>
+    <h2 style="margin-top:8px">Where this goes</h2>
+    <p style="color:var(--muted)">You don't need to know the syllabus — that's the point. Start at the top and go down. Each chapter is one sitting.</p>
+    <ol class="path-list">
+      <li><span class="n">00</span><div><div class="t">Foundations</div><div class="d">The one mental shift from QA to security, how the web looks to an attacker, and the rules that keep this legal.</div></div></li>
+      <li><span class="n">02</span><div><div class="t">The big vulnerabilities</div><div class="d">Access control, SQL injection, XSS, broken auth, and the rest of the OWASP Top 10 — each with a lab.</div></div></li>
+      <li><span class="n">07</span><div><div class="t">Your specialty</div><div class="d">API security testing, built directly on the Postman and <code>requests</code> skills you already have.</div></div></li>
+      <li><span class="n">08</span><div><div class="t">Doing the work</div><div class="d">A repeatable method, how to write a finding that gets fixed, and how to build a legal practice lab at home.</div></div></li>
+    </ol>
+    <div class="btn-row">
+      <button class="btn primary" data-go="ch0">Start Chapter 00 →</button>
+      <button class="btn lab" data-go="lab">Jump to the Practice Lab</button>
+    </div>
+  </div>
+
+  <div class="box warn-box">
+    <div class="box-h"><span class="tag">Ground rule</span> One rule, no exceptions</div>
+    <p>Only ever test systems you own or have <strong>written permission</strong> to test, or purpose-built practice targets. Testing anything else — a live site, a production system without a signed scope, someone's account — is illegal in most places, regardless of intent. Every technique here is taught against safe, legal targets. We'll come back to this in Chapter 00.</p>
+  </div>
+</section>`;
+
+C.ch0 = () => `
+<section>
+  <div class="eyebrow">Chapter 00 · Foundations</div>
+  <h1 class="page-title">The Security Mindset</h1>
+  <p class="lede">You already find bugs for a living. Security testing is the same craft pointed at a different question.</p>
+
+  <h2>The one shift</h2>
+  <p>In functional QA, a test case asks: <em>given valid use, does the system do the right thing?</em> The expected result is "it works." Security testing asks the inverse: <em>given a motivated adversary, can the system be <strong>made</strong> to do the wrong thing?</em> The expected result of a good security test is "the attack fails."</p>
+  <p>That's the whole reframe. Everything else — the tools, the payloads, the jargon — is detail layered on top. A SQL injection test is just a test case whose input is hostile and whose pass condition is "the database refused to be tricked."</p>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> You've done this before</div>
+    <p>Every time you tested a form with an emoji, a 10,000-character string, or a negative quantity, you were doing security testing's ancestor: <strong>boundary and malformed-input testing</strong>. Security testing keeps that instinct and adds a model of <em>who</em> is sending the bad input and <em>what they want</em>.</p>
+  </div>
+
+  <h2>The four words people confuse</h2>
+  <p>You'll hear these constantly. They are not synonyms.</p>
+  <ul>
+    <li><strong>Threat</strong> — <em>who or what</em> could cause harm (a credential-stuffing bot, a disgruntled insider).</li>
+    <li><strong>Vulnerability</strong> — a <em>weakness</em> in the system (a login with no rate limit).</li>
+    <li><strong>Exploit</strong> — the <em>technique or code</em> that actually abuses the weakness (a script that tries 10,000 passwords).</li>
+    <li><strong>Risk</strong> — the <em>combination</em>: how likely the threat is to hit the vulnerability, times how bad it would be. Risk is what you report; the rest are ingredients.</li>
+  </ul>
+  <p>A vulnerability with no plausible threat, or no real impact, is low risk. This is why "we found 300 issues" is useless and "we found 3 that a logged-in user could use to read anyone's data" gets fixed.</p>
+
+  <h2>CIA — the three things you're protecting</h2>
+  <p>Every security goal reduces to one of three properties. When you look at a feature, ask which of these an attacker could break:</p>
+  <ul>
+    <li><strong>Confidentiality</strong> — only the right people can read the data. (Broken by: reading another user's records.)</li>
+    <li><strong>Integrity</strong> — only the right people can change it, and only in valid ways. (Broken by: editing a price before checkout.)</li>
+    <li><strong>Availability</strong> — the system stays up and usable. (Broken by: a request that crashes the server.)</li>
+  </ul>
+
+  <h2>Think in trust boundaries</h2>
+  <p>The single most useful attacker habit: find the lines where data crosses from a place you <em>don't</em> control into a place the system <em>trusts</em>. The browser, the mobile app, the API client, a file upload, a URL parameter, an HTTP header — all of these are <strong>in the attacker's hands</strong>. The developer often assumed otherwise.</p>
+  <p>So the core question becomes: <em>"What did the developer assume the client would never do — and what happens when I do it anyway?"</em> Change the hidden <code>price</code> field. Request an ID that isn't yours. Send a string where a number was expected. You're probing the boundary.</p>
+
+  <div class="box danger-box">
+    <div class="box-h"><span class="tag">Legal</span> The line you do not cross</div>
+    <p>Authorization is the difference between a security engineer and a criminal — the techniques are identical. Before testing anything, you need <strong>ownership or written permission</strong> (a signed scope, a bug-bounty program's rules, or a target built to be attacked). "I was just curious" and "I didn't change anything" are not defenses. When in doubt, don't — practice on the legal targets in Chapter 09 instead.</p>
+  </div>
+
+  <div class="quiz" data-answer="b">
+    <div class="q">Check: A tester finds that any logged-in user can view other users' invoices by changing a number in the URL. Which CIA property is primarily broken?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>Availability — the server is overloaded</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>Confidentiality — data is readable by the wrong people</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>Integrity — the invoices were modified</span></button>
+    </div>
+    <div class="fb"><b>Right — confidentiality.</b> Nothing was changed (that'd be integrity) and nothing went down (availability). Reading data you shouldn't be able to read is a confidentiality break. You'll build this exact attack in the Access Control lab.</div>
+  </div>
+
+  ${completeRow("ch0")}
+</section>`;
+
+C.ch1 = () => `
+<section>
+  <div class="eyebrow">Chapter 01 · Foundations</div>
+  <h1 class="page-title">The Web, Attacker's View</h1>
+  <p class="lede">You know HTTP as plumbing. Now look at the same request as attack surface — every part of it is something you can change.</p>
+
+  <h2>A request is just editable text</h2>
+  <p>This is the liberating realization: an HTTP request is a plain-text message, and the browser is only one program that can send it. <code>curl</code>, Postman, a Python script, or an intercepting proxy can send <em>any</em> request — with headers, cookies, and body of your choosing. The nice form validation in the UI? The attacker simply doesn't use the UI.</p>
+
+  <div class="code-head"><span class="fname">a login request, in full</span><button class="copy-btn" data-copy="POST /api/login HTTP/1.1
+Host: shop.example
+Content-Type: application/json
+Cookie: session=none
+
+{&quot;username&quot;: &quot;suba&quot;, &quot;password&quot;: &quot;hunter2&quot;}">Copy</button></div>
+<pre><code><span class="tok-key">POST</span> /api/login HTTP/1.1
+<span class="tok-key">Host</span>: shop.example
+<span class="tok-key">Content-Type</span>: application/json
+<span class="tok-key">Cookie</span>: session=none
+
+{<span class="tok-str">"username"</span>: <span class="tok-str">"suba"</span>, <span class="tok-str">"password"</span>: <span class="tok-str">"hunter2"</span>}</code></pre>
+
+  <p>Every line is a field you control: the method, the path, each header, the cookie, and the whole body. Security testing is largely the discipline of changing one of these to something the server didn't expect, and reading what comes back.</p>
+
+  <h2>Client-side vs server-side — where trust must live</h2>
+  <p>A rule with no exceptions: <strong>anything enforced only in the client is not enforced at all.</strong> JavaScript that disables the submit button, a hidden <code>isAdmin=false</code> field, a maximum length on an <code>&lt;input&gt;</code> — all of it runs on the attacker's machine and can be stripped, edited, or skipped. The server must re-check everything, because the server is the only part you don't hand to the enemy.</p>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> "Works in the UI" ≠ "is enforced"</div>
+    <p>You've filed bugs where validation was missing on the backend even though the form blocked it. Same muscle. The security version is: assume the UI validation isn't there, send the request directly, and see if the server catches it.</p>
+  </div>
+
+  <h2>Authentication vs authorization</h2>
+  <p>Two words one letter apart, endlessly confused, and the source of a huge share of real breaches:</p>
+  <ul>
+    <li><strong>Authentication (authN)</strong> — <em>who are you?</em> Proving identity: passwords, tokens, MFA.</li>
+    <li><strong>Authorization (authZ)</strong> — <em>what are you allowed to do?</em> Checking permissions on each action.</li>
+  </ul>
+  <p>The classic failure: an app authenticates you perfectly (you really are Suba), then forgets to <em>authorize</em> each request (so Suba can fetch user 1002's data just by asking). That's Chapter 02.</p>
+
+  <h2>Sessions, cookies, and tokens</h2>
+  <p>HTTP is stateless — the server forgets you between requests. So after login the server hands you a <strong>session identifier</strong>, usually in a cookie or a bearer token, and you attach it to every subsequent request to say "still me." Three things an attacker immediately wonders:</p>
+  <ul>
+    <li>Can I <strong>steal</strong> someone else's session token? (via XSS — Chapter 04)</li>
+    <li>Can I <strong>guess or forge</strong> one? (weak randomness, unsigned tokens — Chapter 05)</li>
+    <li>Does changing the token's <em>contents</em> change what I'm allowed to do? (tampering — the token lab)</li>
+  </ul>
+
+  <h2>Your first tool: an intercepting proxy</h2>
+  <p>The tool that makes all of this concrete is an <strong>intercepting proxy</strong> — it sits between your browser and the server so you can pause, read, and <em>edit</em> every request before it goes out. The free standard is <strong>OWASP ZAP</strong>; the industry default is <strong>Burp Suite</strong> (has a free Community edition). Start with ZAP. We'll set it up in Chapter 09; for now, just know that "intercept the request and change the <code>id</code>" is a thing you can literally do.</p>
+
+  <div class="quiz" data-answer="c">
+    <div class="q">Check: An app's checkout page uses JavaScript to prevent the quantity field from going negative. How would you test whether this limit is a real security control?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>Try to type a negative number into the form field</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>Check the JavaScript source to confirm the limit exists</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>Send the request directly (proxy/curl) with a negative quantity, bypassing the JS</span></button>
+    </div>
+    <div class="fb"><b>C.</b> Client-side limits don't count. The only test that matters is whether the <em>server</em> rejects a negative quantity when the request arrives without the UI's help. If it doesn't, you might buy -5 items for a refund.</div>
+  </div>
+
+  ${completeRow("ch1")}
+</section>`;
+
+C.ch2 = () => `
+<section>
+  <div class="eyebrow">Chapter 02 · The Big Vulnerabilities</div>
+  <h1 class="page-title">Broken Access Control</h1>
+  <p class="lede">#1 on the OWASP Top 10, and the easiest class of bug to find by hand. The app knows who you are — it just forgets to check what you're allowed to touch.</p>
+
+  <h2>The shape of the bug</h2>
+  <p>You log in legitimately. Then you ask for a resource that belongs to someone else — by changing an ID, a path, or a parameter — and the server hands it over without checking that it's yours. That's <strong>broken access control</strong>. Its most common form has an ugly name: <strong>IDOR</strong> — Insecure Direct Object Reference.</p>
+  <p>If the URL <code>/api/orders/1002</code> returns <em>your</em> order, the obvious next test is <code>/api/orders/1001</code>. If that returns someone else's order, you've found an IDOR. The "direct object reference" is the raw ID in the request; "insecure" means nothing checks ownership.</p>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> Equivalence classes, weaponized</div>
+    <p>You already test with multiple user accounts and roles. The security test is tiny extra: log in as user A, capture a request for A's data, then replay it asking for B's ID. Expected result: <code>403 Forbidden</code>. Actual result too often: <code>200 OK</code> with B's data.</p>
+  </div>
+
+  <h2>Varieties to probe</h2>
+  <ul>
+    <li><strong>Horizontal</strong> — reaching another user's data <em>at your own privilege level</em> (user → user). The IDOR above.</li>
+    <li><strong>Vertical / privilege escalation</strong> — reaching a <em>higher</em> privilege (user → admin). Try the admin endpoints as a normal user; try setting <code>role=admin</code> in a request body.</li>
+    <li><strong>Missing function-level checks</strong> — the UI hides the "Delete all" button for non-admins, but the endpoint behind it never checks. (Remember: client-side hiding isn't enforcement.)</li>
+  </ul>
+
+  <div class="box def">
+    <div class="box-h"><span class="tag">Defense</span> What a fix looks like</div>
+    <p>Every request that touches a resource must check <em>ownership or role on the server</em>, every time: "does the <em>currently authenticated</em> user own order 1001?" Good systems also use unguessable IDs (UUIDs instead of 1001, 1002) as defense in depth — but obscurity alone isn't the fix; the authorization check is.</p>
+  </div>
+
+  <h2>Try it</h2>
+  <p>In the Access Control lab you're logged in as a normal customer. The order-lookup endpoint has no ownership check. Change the ID and read records that aren't yours — then flip on the server-side check and watch the same request get a <code>403</code>.</p>
+  <div class="btn-row"><button class="btn lab" data-go="lab" data-sub="lab-idor">Open the Access Control lab</button></div>
+
+  <div class="quiz" data-answer="a">
+    <div class="q">Check: Which response to <code>GET /api/orders/1001</code> (sent by the owner of order 1002) indicates a correctly fixed access-control bug?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>403 Forbidden — the server checked ownership and refused</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>200 OK with order 1001's contents</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>404 Not Found — the order doesn't exist</span></button>
+    </div>
+    <div class="fb"><b>A.</b> 403 means the server knew the record existed and deliberately denied access based on who you are. (404 can be a valid privacy-preserving choice too, but 403 is the clean signal that authorization ran.)</div>
+  </div>
+
+  ${completeRow("ch2")}
+</section>`;
+
+C.ch3 = () => `
+<section>
+  <div class="eyebrow">Chapter 03 · The Big Vulnerabilities</div>
+  <h1 class="page-title">SQL Injection</h1>
+  <p class="lede">The classic. You can see it end to end, the mechanism is pure logic, and once it clicks you understand the whole family of "injection" bugs.</p>
+
+  <h2>The mechanism</h2>
+  <p>A database query is just a string the app builds. The bug happens when the app glues your input <em>directly</em> into that string, so your input stops being <strong>data</strong> and becomes part of the <strong>code</strong>. Suppose the login does this:</p>
+
+  <div class="code-head"><span class="fname">vulnerable: input concatenated into the query</span></div>
+<pre><code>query = <span class="tok-str">"SELECT * FROM users WHERE username = '"</span> + username +
+        <span class="tok-str">"' AND password = '"</span> + password + <span class="tok-str">"'"</span></code></pre>
+
+  <p>Now send the password <span class="tok-pay">' OR '1'='1</span>. The string the database receives becomes:</p>
+<pre><code>SELECT * FROM users WHERE username = <span class="tok-str">'suba'</span> AND password = <span class="tok-str">''</span> <span class="tok-pay">OR '1'='1'</span></code></pre>
+  <p>That trailing <code>OR '1'='1'</code> is always true, so the <code>WHERE</code> clause matches every row and you're logged in — usually as the first user in the table, which is frequently the admin. You didn't guess a password; you <em>rewrote the question</em>.</p>
+
+  <h2>The family</h2>
+  <p>Same bug, different interpreters. <strong>Command injection</strong> glues input into a shell command. <strong>XSS</strong> (next chapter) glues it into HTML. The pattern is universal: <em>untrusted input crosses into a context where it's interpreted as instructions.</em> Spot that pattern and you can predict the whole catalogue.</p>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> The nastiest input-validation bug</div>
+    <p>This is an input-validation defect — your home turf — but the "output" is the database executing code. The test inputs are ones you'd never try functionally: a lone quote <code>'</code> (does it throw a SQL error? that's the tell), then <code>' OR '1'='1</code>, then <code>admin'--</code>.</p>
+  </div>
+
+  <h2>Reading the tells</h2>
+  <ul>
+    <li>A single <code>'</code> causes a <strong>500 error</strong> or a visible SQL message → the input reaches the query unescaped. Strong signal. (It's also a finding on its own: leaking SQL errors.)</li>
+    <li><code>admin'--</code> as the username comments out the rest of the query (<code>--</code> starts a SQL comment), so the password check vanishes.</li>
+    <li>Pages that behave differently for <code>' OR '1'='1</code> vs <code>' AND '1'='2</code> reveal injection even when no data is shown ("blind" SQLi).</li>
+  </ul>
+
+  <div class="box def">
+    <div class="box-h"><span class="tag">Defense</span> Parameterized queries</div>
+    <p>The fix is to never build queries by concatenation. Use <strong>parameterized queries / prepared statements</strong>, where the query structure is fixed and your input is sent separately as pure data that can never be read as SQL:</p>
+<pre style="margin-top:10px"><code>cursor.execute(
+  <span class="tok-str">"SELECT * FROM users WHERE username = ? AND password = ?"</span>,
+  (username, password)   <span class="tok-com"># bound as data — ' OR '1'='1 is just a wrong password</span>
+)</code></pre>
+    <p style="margin-top:10px">With binding, <span class="tok-pay">' OR '1'='1</span> becomes a literal string the DB compares against stored passwords — it simply doesn't match, and login fails. That's why the fix works: the quote can't "break out" because input is never parsed as code.</p>
+  </div>
+
+  <h2>Try it</h2>
+  <p>The SQL Injection lab runs a real (tiny) query evaluator against an in-memory user table. Type payloads into the login and watch the exact query the server builds, then watch it resolve. Flip on parameterized mode and watch the same payloads bounce off.</p>
+  <div class="btn-row"><button class="btn lab" data-go="lab" data-sub="lab-sqli">Open the SQL Injection lab</button></div>
+
+  <div class="quiz" data-answer="b">
+    <div class="q">Check: Why does a parameterized query stop <code>' OR '1'='1</code> from working?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>It strips dangerous characters like quotes from the input</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>The input is sent separately as data and never parsed as part of the SQL code</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>It encrypts the input before putting it in the query</span></button>
+    </div>
+    <div class="fb"><b>B.</b> Nothing is stripped or encrypted. The query's structure is compiled first, then your input is bound in as an inert value — so a quote is just a character in a string, never a delimiter that can end the literal and inject logic.</div>
+  </div>
+
+  ${completeRow("ch3")}
+</section>`;
+
+C.ch4 = () => `
+<section>
+  <div class="eyebrow">Chapter 04 · The Big Vulnerabilities</div>
+  <h1 class="page-title">Cross-Site Scripting (XSS)</h1>
+  <p class="lede">Injection again — but the interpreter is the victim's browser, and the code you inject runs as them.</p>
+
+  <h2>The mechanism</h2>
+  <p>XSS happens when an app takes your input and writes it into a web page <em>without escaping it</em>, so the browser treats your input as HTML/JavaScript instead of as text. If a search page echoes your query back and you search for <span class="tok-pay">&lt;script&gt;steal()&lt;/script&gt;</span>, and the app inserts that raw into the page, the victim's browser runs <code>steal()</code> — in the victim's session, with the victim's cookies.</p>
+  <p>That's the real payoff: XSS lets an attacker run script <em>as another user</em>. It's the standard way to steal session tokens (which is why Chapter 01's "can I steal a session?" leads here), make actions on someone's behalf, or deface a page.</p>
+
+  <h2>Three flavors</h2>
+  <ul>
+    <li><strong>Reflected</strong> — the payload is in the request (a URL parameter) and bounced straight back in the response. Delivered by tricking a victim into clicking a crafted link.</li>
+    <li><strong>Stored</strong> — the payload is saved (a comment, a profile name) and served to everyone who views it. The worst kind: no link needed, hits every viewer.</li>
+    <li><strong>DOM-based</strong> — the unsafe insertion happens entirely in client-side JavaScript (e.g. <code>element.innerHTML = location.hash</code>), never touching the server.</li>
+  </ul>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> The output side of input testing</div>
+    <p>SQLi is about what your input does on the way <em>in</em> (to the database). XSS is about what it does on the way <em>out</em> (to a browser). Same discipline, opposite end of the pipe. Your test strings: <code>&lt;b&gt;x&lt;/b&gt;</code> first — if it renders bold, the page isn't escaping HTML, and script will run too.</p>
+  </div>
+
+  <h2>Reading the tells</h2>
+  <p>Inject a harmless marker like <span class="tok-pay">&lt;b&gt;bp&lt;/b&gt;</span> or <span class="tok-pay">bp"'&lt;&gt;</span> and view the response source. If your <code>&lt;</code> and <code>&gt;</code> come back as literal <code>&lt;</code> / <code>&gt;</code> (escaped), you're probably safe in that context. If they come back as raw tags, the page is injectable — escalate to an event-handler payload like <span class="tok-pay">&lt;img src=x onerror=alert(1)&gt;</span>, which fires even when <code>&lt;script&gt;</code> is filtered.</p>
+
+  <div class="box def">
+    <div class="box-h"><span class="tag">Defense</span> Escape on output, by context</div>
+    <p>The fix is <strong>contextual output encoding</strong>: whenever user data is written into a page, escape it for <em>where it lands</em> — HTML-escape (<code>&lt;</code> → <code>&amp;lt;</code>) for body text, attribute-escape inside attributes, JS-escape inside scripts. Modern frameworks (React, Angular) do this by default, which is why raw XSS is rarer in them — until someone reaches for <code>dangerouslySetInnerHTML</code>. A <strong>Content-Security-Policy</strong> header is a strong second layer that blocks injected scripts from running.</p>
+  </div>
+
+  <h2>Try it</h2>
+  <p>The XSS lab reflects your input the way a vulnerable server would. It shows you the exact HTML emitted, tells you whether your payload would execute, then lets you flip on output-escaping to watch the same payload become inert text. (Nothing actually executes — it's a safe simulation of the mechanism.)</p>
+  <div class="btn-row"><button class="btn lab" data-go="lab" data-sub="lab-xss">Open the XSS lab</button></div>
+
+  <div class="quiz" data-answer="c">
+    <div class="q">Check: A reviewer says "we block the word <code>script</code>, so we're safe from XSS." Why is that wrong?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>It's correct — blocking <code>script</code> removes the only XSS vector</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>Because SQL injection can still occur</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>Blocklisting one keyword is bypassable — event handlers like <code>onerror</code> run script with no <code>&lt;script&gt;</code> tag at all</span></button>
+    </div>
+    <div class="fb"><b>C.</b> Blocklists lose. <code>&lt;img src=x onerror=alert(1)&gt;</code>, <code>&lt;svg onload=…&gt;</code>, and dozens of other vectors execute script without the literal word "script." The real fix is escaping on output, not banning keywords on input.</div>
+  </div>
+
+  ${completeRow("ch4")}
+</section>`;
+
+C.ch5 = () => `
+<section>
+  <div class="eyebrow">Chapter 05 · The Big Vulnerabilities</div>
+  <h1 class="page-title">Authentication &amp; Session Failures</h1>
+  <p class="lede">Getting "who are you?" wrong, and getting "prove you're still you" wrong. Two related failure zones with very testable symptoms.</p>
+
+  <h2>Authentication weaknesses</h2>
+  <ul>
+    <li><strong>No rate limiting / lockout</strong> — the login accepts unlimited guesses, enabling brute-force and <strong>credential stuffing</strong> (replaying leaked username/password pairs). Test: send many failed logins quickly; does anything slow or stop you?</li>
+    <li><strong>Weak password policy</strong> — accepts <code>password</code>, <code>123456</code>. Test: try the known-worst passwords.</li>
+    <li><strong>Username enumeration</strong> — the app says "no such user" vs "wrong password," or responds faster for invalid users, letting an attacker build a list of valid accounts. Test: compare responses for a real vs fake username.</li>
+    <li><strong>Insecure password reset</strong> — guessable reset tokens, reset links that don't expire, or reset flows that leak whether an email exists.</li>
+  </ul>
+
+  <h2>Session weaknesses</h2>
+  <ul>
+    <li><strong>Predictable tokens</strong> — session IDs that increment or follow a pattern can be guessed. They must be long and random.</li>
+    <li><strong>Session fixation</strong> — the app keeps the <em>same</em> session ID before and after login, so an attacker who planted an ID earlier is now logged in as you. Fix: issue a fresh session on login.</li>
+    <li><strong>Tokens that don't expire or survive logout</strong> — a stolen token is useful forever.</li>
+    <li><strong>Missing cookie flags</strong> — session cookies without <code>HttpOnly</code> (readable by XSS) and <code>Secure</code> (sent over plain HTTP).</li>
+  </ul>
+
+  <h2>Encoding is not encryption</h2>
+  <p>A trap worth internalizing early. Many tokens (like JWTs) are <strong>Base64-encoded</strong>, which looks scrambled but is trivially reversible — it's a format, not a lock. Anyone can decode a JWT and read its contents. What protects a JWT is its <strong>signature</strong>: the server signs it with a secret key, so you can <em>read</em> the token but can't <em>forge</em> a changed one without the key. The real-world bug is apps that forget to verify the signature — then you can edit <code>"role":"user"</code> to <code>"role":"admin"</code> and sail through.</p>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> State and persistence, as an attacker</div>
+    <p>You already test "log out, hit back — am I still in?" and "does my session survive a password change?" Those are session security tests. Add: "if I keep the old token after logout, does it still work?" and "if I change the token, does the server notice?"</p>
+  </div>
+
+  <div class="box def">
+    <div class="box-h"><span class="tag">Defense</span> The checklist</div>
+    <p>Rate-limit and lock out logins; enforce strong passwords + offer MFA; return <em>identical</em> responses for invalid-user and wrong-password; use long random session IDs; rotate the session on login; expire tokens and honor logout server-side; set <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite</code> on session cookies; and always <em>verify</em> token signatures server-side.</p>
+  </div>
+
+  <h2>Try it</h2>
+  <p>The Token Inspector lets you decode a JWT to see it's just readable Base64, tamper with the payload, and watch the signature check catch the forgery (or fail to, when verification is off).</p>
+  <div class="btn-row"><button class="btn lab" data-go="lab" data-sub="lab-jwt">Open the Token Inspector</button></div>
+
+  <div class="quiz" data-answer="a">
+    <div class="q">Check: You decode a session JWT and can read the user's role in plain text. Is this, by itself, a vulnerability?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>No — JWTs are signed, not encrypted; being readable is expected. The bug would be if you could change it and the server accepted it.</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>Yes — any readable token is a critical data leak</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>Yes — it means the token isn't Base64-encoded</span></button>
+    </div>
+    <div class="fb"><b>A.</b> Readability is by design. The security question is integrity: can you <em>modify</em> the token and have it honored? If signature verification is missing or weak, yes — and that's the finding. Don't put secrets in a JWT payload, but reading one isn't the bug.</div>
+  </div>
+
+  ${completeRow("ch5")}
+</section>`;
+
+C.ch6 = () => `
+<section>
+  <div class="eyebrow">Chapter 06 · The Big Vulnerabilities</div>
+  <h1 class="page-title">The Rest of the Top 10</h1>
+  <p class="lede">The remaining OWASP Top 10 categories, each in a paragraph. You don't need depth on all of them yet — you need to recognize them and know the first test.</p>
+
+  <h2>Security Misconfiguration</h2>
+  <p>The most common category in the wild, because it needs no clever payload. Default credentials left in place (<code>admin/admin</code>), debug mode on in production (verbose stack traces that leak internals), directory listing enabled, admin panels exposed to the internet, cloud storage buckets set to public. <strong>First test:</strong> try default creds; trigger an error and read what it reveals; request <code>/admin</code>, <code>/.git/</code>, <code>/.env</code>, <code>/backup.zip</code>.</p>
+
+  <h2>Cryptographic Failures</h2>
+  <p>Sensitive data not protected properly: passwords stored in plain text or with weak hashing (MD5), data sent over plain <code>http://</code>, secrets hardcoded in client code, weak or home-grown encryption. <strong>First test:</strong> is the whole site HTTPS? Check how passwords are stored if you can see the database (in your lab). Look for API keys in the JavaScript.</p>
+
+  <h2>Vulnerable &amp; Outdated Components</h2>
+  <p>Your app is mostly other people's code — libraries, frameworks, container images — and those have known, published vulnerabilities (CVEs). Running an old version with a known exploit is often the <em>easiest</em> way in. <strong>First test:</strong> fingerprint versions (headers, JS files, <code>/package.json</code>), then check them with a scanner. This one maps beautifully to CI — see Chapter 07.</p>
+
+  <h2>Insecure Design</h2>
+  <p>Not a coding bug but a <em>missing control</em> — the feature was designed without thinking about abuse. A password-reset with no limit on attempts, a "transfer funds" flow with no confirmation, a coupon system that doesn't stop one code being used a million times. <strong>First test:</strong> for each feature, ask "how would I abuse this if I were malicious and patient?"</p>
+
+  <h2>Software &amp; Data Integrity Failures</h2>
+  <p>Trusting code or data that could've been tampered with: auto-updates with no signature check, CI/CD pipelines pulling unverified dependencies (<strong>supply-chain attacks</strong>), or <strong>insecure deserialization</strong> — rebuilding objects from attacker-controlled data, which can run code. <strong>First test:</strong> look for serialized blobs in cookies/params and whether they're signed.</p>
+
+  <h2>Security Logging &amp; Monitoring Failures</h2>
+  <p>Not an attack you perform but a gap you report: if the app doesn't log auth failures, access-control denials, or suspicious activity — and nobody watches the logs — breaches go undetected for months. <strong>First test:</strong> ask whether your test attacks showed up anywhere. Silence is the finding.</p>
+
+  <h2>Server-Side Request Forgery (SSRF)</h2>
+  <p>You trick the <em>server</em> into making a request on your behalf. If a feature fetches a URL you supply (an "import from URL," a webhook, an avatar-by-link), you point it inward — at <code>http://localhost/admin</code> or a cloud metadata endpoint like <code>169.254.169.254</code> — and the server, trusted inside the network, fetches secrets you couldn't reach directly. <strong>First test:</strong> find any feature that fetches a URL and give it an internal address.</p>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> You're building a threat checklist</div>
+    <p>Think of these ten as a test-plan template. For any feature, walk the list and ask "is this one in play here?" Most won't be — but the one that is, is your finding. That's exactly how you already turn a spec into a coverage matrix.</p>
+  </div>
+
+  <div class="quiz" data-answer="b">
+    <div class="q">Check: An app lets users add a profile picture "by URL" — the server downloads the image from whatever link you provide. Which Top 10 category should you immediately test for?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>SQL Injection</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>SSRF — point it at an internal address and see if the server fetches it</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>Cryptographic Failures</span></button>
+    </div>
+    <div class="fb"><b>B.</b> "Server fetches a URL you control" is the textbook SSRF setup. Try <code>http://localhost/</code> or a metadata IP and see whether you get back something the server could reach but you shouldn't.</div>
+  </div>
+
+  ${completeRow("ch6")}
+</section>`;
+
+C.ch7 = () => `
+<section>
+  <div class="eyebrow">Chapter 07 · Your Specialty</div>
+  <h1 class="page-title">API Security Testing</h1>
+  <p class="lede">This is your home field. You already drive APIs with Postman and <code>requests</code> — security testing an API is the same workflow with hostile inputs and permission checks added.</p>
+
+  <h2>Why APIs are their own game</h2>
+  <p>APIs skip the UI entirely, so <em>all</em> the client-side guardrails are already gone — there was never a form to validate. They're also highly structured and well-documented (OpenAPI/Swagger specs), which is a gift: the spec is a map of every endpoint, parameter, and expected type. OWASP maintains a separate <strong>API Security Top 10</strong> for exactly this reason. The headline risks:</p>
+
+  <h3>BOLA — Broken Object Level Authorization (API Top 10 #1)</h3>
+  <p>IDOR's API-native twin, and the single most common API vulnerability. <code>GET /api/users/1001/messages</code> returns your messages; try <code>1002</code>. Because you already parametrize requests in <code>requests</code>, you can test this across every ID in seconds. <strong>Test pattern:</strong> authenticate as user A, then loop every object-ID endpoint asking for B's objects; flag any <code>200</code>.</p>
+
+  <h3>Broken Function Level Authorization</h3>
+  <p>Admin-only endpoints (<code>POST /api/admin/promote</code>) that a normal user's token can still call. The UI never showed you the button; the API never checks your role. <strong>Test pattern:</strong> take an admin action's request, replay it with a low-privilege token.</p>
+
+  <h3>Mass Assignment</h3>
+  <p>The API binds your whole JSON body to an object, including fields you weren't supposed to set. You send <code>{"name":"Suba"}</code> to update your profile — but also sneak in <code>{"role":"admin","verified":true}</code> and the server blindly saves them. <strong>Test pattern:</strong> add privileged-looking fields (<code>isAdmin</code>, <code>role</code>, <code>balance</code>) to request bodies and check if they stick.</p>
+
+  <h3>Also on the list</h3>
+  <ul>
+    <li><strong>No rate limiting</strong> — APIs that let you hammer endpoints (enumeration, brute force, cost-run-up).</li>
+    <li><strong>Excessive data exposure</strong> — the endpoint returns the whole user object (password hash, email, tokens) and expects the <em>client</em> to hide fields. The client doesn't have to.</li>
+    <li><strong>Improper inventory</strong> — forgotten <code>/v1/</code> endpoints still live after <code>/v2/</code> shipped, old and unpatched.</li>
+  </ul>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> Your pytest suite, one assertion flipped</div>
+    <p>Your functional API test asserts <code>status == 200</code> for valid input. The security test asserts <code>status == 403</code> for a <em>forbidden</em> request. Same fixtures, same client, inverted expectation. You can add a security layer to an existing suite without new tooling.</p>
+  </div>
+
+  <h2>Starter: a BOLA check in requests</h2>
+  <p>Run this <strong>against your own legal lab</strong> (Juice Shop, or an app you own) — never a third-party API. It logs in as one user and checks whether their token can read another user's object.</p>
+
+  <div class="code-head"><span class="fname">test_bola.py — authorized-lab use only</span><button class="copy-btn" data-copy="import requests
+
+BASE = &quot;http://localhost:3000&quot;  # your local lab only
+
+# 1) Authenticate as user A, grab the token
+r = requests.post(f&quot;{BASE}/rest/user/login&quot;,
+                  json={&quot;email&quot;: &quot;a@test.local&quot;, &quot;password&quot;: &quot;aaaa&quot;})
+token = r.json()[&quot;authentication&quot;][&quot;token&quot;]
+headers = {&quot;Authorization&quot;: f&quot;Bearer {token}&quot;}
+
+# 2) As user A, try to read objects you shouldn't own
+for obj_id in range(1, 20):
+    resp = requests.get(f&quot;{BASE}/api/BasketItems/{obj_id}&quot;, headers=headers)
+    if resp.status_code == 200:
+        print(f&quot;[POSSIBLE BOLA] id={obj_id} returned 200 as user A&quot;)
+    else:
+        print(f&quot;ok   id={obj_id} -> {resp.status_code}&quot;)">Copy</button></div>
+<pre><code><span class="tok-key">import</span> requests
+
+BASE = <span class="tok-str">"http://localhost:3000"</span>  <span class="tok-com"># your local lab only</span>
+
+<span class="tok-com"># 1) Authenticate as user A, grab the token</span>
+r = requests.post(f<span class="tok-str">"{BASE}/rest/user/login"</span>,
+                  json={<span class="tok-str">"email"</span>: <span class="tok-str">"a@test.local"</span>, <span class="tok-str">"password"</span>: <span class="tok-str">"aaaa"</span>})
+token = r.json()[<span class="tok-str">"authentication"</span>][<span class="tok-str">"token"</span>]
+headers = {<span class="tok-str">"Authorization"</span>: f<span class="tok-str">"Bearer {token}"</span>}
+
+<span class="tok-com"># 2) As user A, try to read objects you shouldn't own</span>
+<span class="tok-key">for</span> obj_id <span class="tok-key">in</span> range(1, 20):
+    resp = requests.get(f<span class="tok-str">"{BASE}/api/BasketItems/{obj_id}"</span>, headers=headers)
+    <span class="tok-key">if</span> resp.status_code == 200:
+        print(f<span class="tok-str">"[POSSIBLE BOLA] id={obj_id} returned 200 as user A"</span>)
+    <span class="tok-key">else</span>:
+        print(f<span class="tok-str">"ok   id={obj_id} -> {resp.status_code}"</span>)</code></pre>
+
+  <div class="box def">
+    <div class="box-h"><span class="tag">Defense</span> What the API should do</div>
+    <p>Authorize every object access against the authenticated principal (not an ID in the request); use an allow-list of settable fields to kill mass assignment; return only the fields the client needs; rate-limit per user and per IP; and retire old API versions. Then your security tests become regression tests — exactly the shift-left move in the next chapter.</p>
+  </div>
+
+  <div class="quiz" data-answer="c">
+    <div class="q">Check: You <code>PATCH /api/profile</code> with <code>{"displayName":"x","role":"admin"}</code> and your account becomes an admin. Which API risk is this?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>Excessive data exposure</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>Broken Object Level Authorization (BOLA)</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>Mass assignment — the server bound a field you shouldn't be able to set</span></button>
+    </div>
+    <div class="fb"><b>C.</b> You set a privileged field (<code>role</code>) the endpoint never meant to accept, and it was blindly saved. The fix is an allow-list of writable fields. BOLA would be reading <em>another user's</em> profile; exposure would be the response <em>returning</em> too much.</div>
+  </div>
+
+  ${completeRow("ch7")}
+</section>`;
+
+C.ch8 = () => `
+<section>
+  <div class="eyebrow">Chapter 08 · Doing the Work</div>
+  <h1 class="page-title">Method &amp; Reporting</h1>
+  <p class="lede">A repeatable process so testing isn't random poking, and a finding format so your work actually gets fixed. Both map almost one-to-one onto skills you already have.</p>
+
+  <h2>The method</h2>
+  <p>A security test follows the same arc every time. It's a test cycle with recon bolted on the front:</p>
+  <ol>
+    <li><strong>Scope</strong> — agree in writing what you may test and how. This is the legal gate; nothing starts without it.</li>
+    <li><strong>Recon</strong> — map what exists: pages, endpoints, parameters, technologies, versions. (Your "read the spec and build a coverage matrix" step.)</li>
+    <li><strong>Map the attack surface</strong> — for each input and trust boundary, note which Top-10 categories could apply.</li>
+    <li><strong>Discover</strong> — test those hypotheses with payloads and manipulated requests.</li>
+    <li><strong>Prove (exploit)</strong> — demonstrate real impact. "I changed one number and read another user's data" beats "this parameter looks risky." Proof is what separates a finding from a guess.</li>
+    <li><strong>Report</strong> — write it up so it can be reproduced and fixed.</li>
+    <li><strong>Retest</strong> — after the fix, confirm it's actually closed. (Your regression pass.)</li>
+  </ol>
+
+  <h2>Severity: CVSS in one minute</h2>
+  <p>Findings are ranked so the worst get fixed first. The industry standard is <strong>CVSS</strong> (Common Vulnerability Scoring System), a 0–10 score built from factors like: how reachable is it (network vs local), how hard to exploit, does it need privileges or user interaction, and what's the impact to Confidentiality / Integrity / Availability. You don't need to compute it by hand — use an online CVSS calculator — but understand the intuition: <em>easy to reach + easy to exploit + high impact = critical</em>. An unauthenticated SQL injection that dumps the user table is a 9–10; a self-XSS you can only fire on yourself is a 2–3.</p>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">QA bridge</span> Severity you already do</div>
+    <p>You triage bugs by impact and likelihood every sprint. CVSS is that instinct with a shared rubric so three teams agree on "critical." The reproduction-steps discipline is identical to a good bug report — you're already excellent at this part.</p>
+  </div>
+
+  <h2>Writing a finding that gets fixed</h2>
+  <p>A security finding is a bug report with two extra sections: <strong>impact</strong> (why a busy engineer should care) and <strong>remediation</strong> (what to change). Use this template:</p>
+
+  <div class="code-head"><span class="fname">finding-template.md</span><button class="copy-btn" data-copy="# [SEVERITY] Short, specific title
+e.g. [High] IDOR in /api/orders lets any user read others' orders
+
+## Summary
+One or two sentences: what the flaw is and who can use it.
+
+## Severity
+CVSS: 7.5 (High) — vector string if you have it.
+
+## Steps to Reproduce
+1. Log in as a standard user (order #1002).
+2. Send: GET /api/orders/1001  (Authorization: Bearer <user token>)
+3. Observe: 200 OK returning order #1001, owned by another user.
+
+## Impact
+Any authenticated user can read every other user's order data
+(names, addresses, items). Confidentiality breach across all accounts.
+
+## Evidence
+Request/response, screenshot, or script output.
+
+## Remediation
+Enforce ownership on the server: verify the authenticated user owns
+the requested order before returning it; return 403 otherwise.
+
+## Retest
+After fix: same request returns 403; owner's own order still 200.">Copy</button></div>
+<pre><code><span class="tok-com"># [SEVERITY] Short, specific title</span>
+e.g. [High] IDOR in /api/orders lets any user read others' orders
+
+<span class="tok-com">## Summary</span>
+One or two sentences: what the flaw is and who can use it.
+
+<span class="tok-com">## Severity</span>
+CVSS: 7.5 (High) — vector string if you have it.
+
+<span class="tok-com">## Steps to Reproduce</span>
+1. Log in as a standard user (order #1002).
+2. Send: GET /api/orders/1001  (Authorization: Bearer &lt;user token&gt;)
+3. Observe: 200 OK returning order #1001, owned by another user.
+
+<span class="tok-com">## Impact</span>
+Any authenticated user can read every other user's order data
+(names, addresses, items). Confidentiality breach across all accounts.
+
+<span class="tok-com">## Evidence</span>
+Request/response, screenshot, or script output.
+
+<span class="tok-com">## Remediation</span>
+Enforce ownership on the server: verify the authenticated user owns
+the requested order before returning it; return 403 otherwise.
+
+<span class="tok-com">## Retest</span>
+After fix: same request returns 403; owner's own order still 200.</code></pre>
+
+  <div class="box def">
+    <div class="box-h"><span class="tag">Defense mindset</span> You're on the fixers' side</div>
+    <p>Because you're a QA engineer, your advantage over a pure pentester is the remediation and retest sections — you think about the fix and the regression test from day one. A finding that hands the developer a clear fix and a retest they can automate is the one that closes fast.</p>
+  </div>
+
+  <div class="quiz" data-answer="b">
+    <div class="q">Check: Which finding is most likely to be prioritized and fixed quickly?</div>
+    <div class="opts">
+      <button class="opt" data-opt="a"><span class="k">A</span><span>"The login parameter looks like it might be vulnerable to injection."</span></button>
+      <button class="opt" data-opt="b"><span class="k">B</span><span>"Sending <code>admin'--</code> logs in as admin with no password. Steps + screenshot attached. Fix: parameterize the query."</span></button>
+      <button class="opt" data-opt="c"><span class="k">C</span><span>"Found 40 potential issues from an automated scan, full report attached."</span></button>
+    </div>
+    <div class="fb"><b>B.</b> Proven impact, clear reproduction, concrete fix. A is a guess with no proof; C is noise that offloads triage onto the dev team. Proof + a fix is what moves a ticket.</div>
+  </div>
+
+  ${completeRow("ch8")}
+</section>`;
+
+C.ch9 = () => `
+<section>
+  <div class="eyebrow">Chapter 09 · Doing the Work</div>
+  <h1 class="page-title">Your Lab &amp; Next Steps</h1>
+  <p class="lede">Everything so far was simulated or conceptual. Here's how to build a real, legal playground on your own machine — and where to go once this course runs out.</p>
+
+  <h2>Build a home lab (one evening)</h2>
+  <p>The whole point of a lab is a target you fully own, so you can attack without permission worries. Easiest path, given you have Docker or can install it:</p>
+  <ol>
+    <li><strong>OWASP Juice Shop</strong> — a modern, deliberately-vulnerable web app with every bug in this course and a built-in scoreboard. One command:
+      <div class="code-head"><span class="fname">terminal</span><button class="copy-btn" data-copy="docker run --rm -p 3000:3000 bkimminich/juice-shop">Copy</button></div>
+<pre><code>docker run --rm -p 3000:3000 bkimminich/juice-shop</code></pre>
+      Then open <code>http://localhost:3000</code>. It's yours; attack freely.</li>
+    <li><strong>DVWA</strong> (Damn Vulnerable Web Application) — older, PHP, with difficulty levels that show you the same bug with weak vs strong defenses side by side. Great for seeing <em>why</em> a fix works.</li>
+    <li>Point <strong>OWASP ZAP</strong> at <code>localhost:3000</code> as your intercepting proxy, and run your <code>requests</code> scripts against it too.</li>
+  </ol>
+
+  <div class="box warn-box">
+    <div class="box-h"><span class="tag">Reminder</span> Keep it on localhost</div>
+    <p>Run these on your own machine, bound to <code>localhost</code>. Don't expose a deliberately-vulnerable app to the internet — you'd be hosting a real foothold for actual attackers.</p>
+  </div>
+
+  <h2>Guided practice beyond the lab</h2>
+  <p>When you want structured challenges with hints, these are the standards — all legal by design:</p>
+  <ul>
+    <li><strong>PortSwigger Web Security Academy</strong> — free, excellent, made by the Burp Suite team. The closest thing to a definitive web-security curriculum. Start here after this course.</li>
+    <li><strong>TryHackMe</strong> — guided, beginner-friendly rooms in a browser; gentle on-ramp.</li>
+    <li><strong>Hack The Box</strong> — less hand-holding, more realistic machines; go here when you want a challenge.</li>
+    <li><strong>PentesterLab</strong> — focused exercises, strong on code-level understanding.</li>
+  </ul>
+
+  <h2>Fold it into your actual job</h2>
+  <p>You don't need to become a full-time pentester to make this pay off — you're positioned to do something rarer: <strong>shift security left into QA</strong>.</p>
+  <ul>
+    <li>Add a handful of <strong>security assertions</strong> to your existing pytest API suite (the BOLA/mass-assignment checks from Chapter 07). Now every CI run checks authorization, not just functionality.</li>
+    <li>Add <strong>dependency scanning</strong> to CI (tools like <code>pip-audit</code>, <code>npm audit</code>, Trivy, or Dependabot) to catch vulnerable components automatically.</li>
+    <li>Run <strong>ZAP's automated baseline scan</strong> in a pipeline against a test deployment for a cheap first pass.</li>
+    <li>In <strong>spec reviews</strong> (already your strength), add the Top-10 checklist: "how could this feature be abused?" You'll catch insecure-design issues before a line is written.</li>
+  </ul>
+
+  <div class="box qa">
+    <div class="box-h"><span class="tag">Your edge</span> QA + security is a scarce combination</div>
+    <p>Most security folks can't write a maintainable automated regression suite; most QA folks don't think like an attacker. You're building both. The highest-leverage move is making security testing <em>repeatable and automated</em> — which is the thing you're already better at than almost any pentester.</p>
+  </div>
+
+  <h2>Credentials (only if you want them)</h2>
+  <p>Not required to start, and not required to be good — but if a title helps: <strong>PortSwigger's free certification</strong> and <strong>CompTIA Security+</strong> for breadth, <strong>eJPT</strong> as a gentle hands-on cert, and <strong>OSCP</strong> as the well-known (hard, pricey) practical pentest cert much later. Skills and a portfolio of findings matter more than any of these.</p>
+
+  <div class="box def">
+    <div class="box-h"><span class="tag">You've finished the map</span> What you can do now</div>
+    <p>You can look at a feature and name its trust boundaries, predict which Top-10 categories apply, test them by hand or by script, prove impact, and write a finding that gets fixed. That's the core loop of security testing. The rest is reps — go get them in the labs above.</p>
+  </div>
+
+  ${completeRow("ch9")}
+</section>`;
+
+/* ---------------- PRACTICE LAB ---------------- */
+C.lab = () => `
+<section>
+  <div class="eyebrow">Hands-On</div>
+  <h1 class="page-title">Practice Lab</h1>
+  <p class="lede">Four live simulations of vulnerable endpoints. Type real payloads and watch the mechanism resolve. Every "server" here runs entirely in your browser — nothing touches a network, so this is 100% legal to hammer.</p>
+
+  <!-- SQLi -->
+  <div class="lab" id="lab-sqli">
+    <div class="lab-head">
+      <span class="vuln-badge">SQL Injection</span>
+      <h3>Vulnerable Login</h3>
+      <div class="sub">The server builds its query by string concatenation. Log in without a valid password.</div>
+    </div>
+    <div class="lab-body">
+      <div class="lab-grid">
+        <div>
+          <div class="field"><label>username</label><input id="sqli-user" value="suba" autocomplete="off" spellcheck="false"></div>
+          <div class="field"><label>password</label><input id="sqli-pass" value="wrongpass" autocomplete="off" spellcheck="false"></div>
+          <div class="chip-row">
+            <span class="chip-lbl">try:</span>
+            <button class="payload-chip" data-sqli="' OR '1'='1">' OR '1'='1</button>
+            <button class="payload-chip" data-sqli="admin'--">admin'--</button>
+            <button class="payload-chip" data-sqli="'">'  (single quote)</button>
+          </div>
+          <div class="lab-controls">
+            <button class="btn primary" id="sqli-go">Send login request</button>
+            <label class="toggle"><input type="checkbox" id="sqli-secure"> parameterized</label>
+          </div>
+        </div>
+        <div>
+          <div class="field"><label>the query the server runs</label></div>
+          <div class="term-out" id="sqli-query"><span class="dim">Press "Send login request" to see the constructed SQL.</span></div>
+        </div>
+      </div>
+      <div class="verdict" id="sqli-verdict"></div>
+    </div>
+  </div>
+
+  <!-- IDOR -->
+  <div class="lab" id="lab-idor">
+    <div class="lab-head">
+      <span class="vuln-badge">Broken Access Control</span>
+      <h3>Order Lookup (IDOR)</h3>
+      <div class="sub">You're authenticated as <b>suba</b>, who owns order <b>1002</b>. The endpoint doesn't check ownership. Read orders that aren't yours.</div>
+    </div>
+    <div class="lab-body">
+      <div class="lab-grid">
+        <div>
+          <div class="field"><label>GET /api/orders/&lt;id&gt;  —  as user: suba</label><input id="idor-id" value="1002" autocomplete="off" inputmode="numeric"></div>
+          <div class="chip-row">
+            <span class="chip-lbl">ids:</span>
+            <button class="payload-chip" data-idor="1001">1001</button>
+            <button class="payload-chip" data-idor="1002">1002 (yours)</button>
+            <button class="payload-chip" data-idor="1003">1003</button>
+            <button class="payload-chip" data-idor="1000">1000</button>
+          </div>
+          <div class="lab-controls">
+            <button class="btn primary" id="idor-go">Send request</button>
+            <label class="toggle"><input type="checkbox" id="idor-secure"> ownership check</label>
+          </div>
+        </div>
+        <div>
+          <div class="field"><label>response</label></div>
+          <div class="term-out" id="idor-out"><span class="dim">Send a request to see the response.</span></div>
+        </div>
+      </div>
+      <div class="verdict" id="idor-verdict"></div>
+    </div>
+  </div>
+
+  <!-- XSS -->
+  <div class="lab" id="lab-xss">
+    <div class="lab-head">
+      <span class="vuln-badge">Cross-Site Scripting</span>
+      <h3>Reflected Search</h3>
+      <div class="sub">The search page echoes your query back into the HTML. Craft input that would execute as script. (Simulated — nothing actually runs.)</div>
+    </div>
+    <div class="lab-body">
+      <div class="lab-grid">
+        <div>
+          <div class="field"><label>search query</label><textarea id="xss-in" rows="2" spellcheck="false" autocomplete="off">laptop</textarea></div>
+          <div class="chip-row">
+            <span class="chip-lbl">try:</span>
+            <button class="payload-chip" data-xss="&lt;b&gt;probe&lt;/b&gt;">&lt;b&gt;probe&lt;/b&gt;</button>
+            <button class="payload-chip" data-xss="&lt;img src=x onerror=alert(1)&gt;">&lt;img ... onerror&gt;</button>
+            <button class="payload-chip" data-xss="&lt;script&gt;steal()&lt;/script&gt;">&lt;script&gt;</button>
+          </div>
+          <div class="lab-controls">
+            <button class="btn primary" id="xss-go">Submit search</button>
+            <label class="toggle"><input type="checkbox" id="xss-secure"> escape output</label>
+          </div>
+        </div>
+        <div>
+          <div class="field"><label>HTML the server emits into the page</label></div>
+          <div class="term-out" id="xss-out"><span class="dim">Submit a search to see the emitted HTML.</span></div>
+        </div>
+      </div>
+      <div class="verdict" id="xss-verdict"></div>
+    </div>
+  </div>
+
+  <!-- JWT -->
+  <div class="lab" id="lab-jwt">
+    <div class="lab-head">
+      <span class="vuln-badge">Auth / Session</span>
+      <h3>Token Inspector</h3>
+      <div class="sub">A JWT is Base64, not encryption — you can read it. Decode it, change your role to <b>admin</b>, and see whether the server's signature check catches the forgery.</div>
+    </div>
+    <div class="lab-body">
+      <div class="lab-grid">
+        <div>
+          <div class="field"><label>session token (JWT)</label><textarea id="jwt-in" rows="4" spellcheck="false" autocomplete="off"></textarea></div>
+          <div class="chip-row">
+            <span class="chip-lbl">edit payload role:</span>
+            <button class="payload-chip" data-jwt-role="user">role=user</button>
+            <button class="payload-chip" data-jwt-role="admin">role=admin</button>
+          </div>
+          <div class="lab-controls">
+            <button class="btn primary" id="jwt-go">Decode &amp; submit to server</button>
+            <label class="toggle"><input type="checkbox" id="jwt-secure" checked> verify signature</label>
+          </div>
+        </div>
+        <div>
+          <div class="field"><label>decoded contents + server decision</label></div>
+          <div class="term-out" id="jwt-out"><span class="dim">Decode the token to read its contents.</span></div>
+        </div>
+      </div>
+      <div class="verdict" id="jwt-verdict"></div>
+    </div>
+  </div>
+
+  <div class="box qa" style="margin-top:28px">
+    <div class="box-h"><span class="tag">Next</span> Take it to a real target</div>
+    <p>These labs teach the mechanism in isolation. For the full experience — a real app, a real proxy, your own scripts — set up OWASP Juice Shop from Chapter 09 and reproduce each of these against it.</p>
+    <div class="btn-row"><button class="btn lab" data-go="ch9">Go to Chapter 09: Your Lab →</button></div>
+  </div>
+</section>`;
+
+/* ---------------- RESOURCES ---------------- */
+C.resources = () => {
+  const res = [
+    ["Practice target","OWASP Juice Shop","The deliberately-vulnerable app that covers every bug in this course. One Docker command; your legal playground.","https://owasp.org/www-project-juice-shop/"],
+    ["Curriculum","PortSwigger Web Security Academy","Free, authoritative, hands-on labs from the Burp Suite team. Your natural next step after Breakpoint.","https://portswigger.net/web-security"],
+    ["Reference","OWASP Top 10","The canonical list of the ten most critical web risks — the backbone of Chapters 02–06.","https://owasp.org/www-project-top-ten/"],
+    ["Reference","OWASP API Security Top 10","The API-specific risk list behind Chapter 07 (BOLA, mass assignment, and friends).","https://owasp.org/API-Security/"],
+    ["Tool","OWASP ZAP","Free intercepting proxy and scanner. Pause, read, and edit any request between browser and server.","https://www.zaproxy.org/"],
+    ["Guided practice","TryHackMe","Browser-based, beginner-friendly guided rooms. A gentle on-ramp to real challenges.","https://tryhackme.com/"],
+    ["Guided practice","Hack The Box","More realistic machines with less hand-holding — for when you want to be challenged.","https://www.hackthebox.com/"],
+    ["Reference","OWASP Cheat Sheet Series","Concise, trustworthy defensive guidance for each vulnerability class — great for the remediation half of a finding.","https://cheatsheetseries.owasp.org/"],
+    ["Reference","OWASP WSTG","The Web Security Testing Guide — a thorough, structured methodology when you want the full checklist.","https://owasp.org/www-project-web-security-testing-guide/"],
+  ];
+  return `
+<section>
+  <div class="eyebrow">Hands-On</div>
+  <h1 class="page-title">Resources</h1>
+  <p class="lede">The standard, trustworthy, free (or free-tier) places to keep going. Everything here is legal to use by design — practice targets built to be attacked and reference material from OWASP and PortSwigger.</p>
+  <div class="res-grid">
+    ${res.map(([tag,title,desc,url]) => `
+      <a class="res-card" href="${url}" target="_blank" rel="noopener noreferrer">
+        <div class="rc-tag">${tag}</div>
+        <div class="rc-title">${title}</div>
+        <div class="rc-desc">${desc}</div>
+        <div class="rc-url">${url.replace(/^https?:\/\//,"")}</div>
+      </a>`).join("")}
+  </div>
+
+  <div class="box warn-box" style="margin-top:28px">
+    <div class="box-h"><span class="tag">Always</span> The rule travels with you</div>
+    <p>Everything linked here is a sanctioned target. The moment you leave them, you need ownership or written permission before you test anything. No exceptions — that line is what keeps this a career instead of a charge.</p>
+  </div>
+</section>`;
+};
+
+/* ---------- shared partials ---------- */
+function completeRow(ch){
+  return `<div class="complete-row" data-complete="${ch}">
+    <button class="btn primary complete-btn">Mark chapter complete</button>
+    <span class="done-flag">✓ Completed — nice work</span>
+  </div>`;
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+const content = document.getElementById("content");
+const navEl = document.getElementById("nav");
+let current = "home";
+
+/* build nav */
+function buildNav(){
+  const all = [{id:"home",ix:"◆",label:"Overview",group:"Start"}, ...CHAPTERS, ...EXTRAS];
+  let html = "", lastGroup = null;
+  for(const item of all){
+    if(item.group !== lastGroup){ html += `<div class="nav-group">${item.group}</div>`; lastGroup = item.group; }
+    html += `<button class="nav-item" data-go="${item.id}" id="nav-${item.id}">
+      <span class="ix">${item.ix}</span><span class="lbl">${item.label}</span><span class="chk">✓</span>
+    </button>`;
+  }
+  navEl.innerHTML = html;
+}
+
+function updateProgress(){
+  const n = CHAPTERS.filter(c => done.has(c.id)).length;
+  const pct = Math.round((n / TOTAL) * 100);
+  document.getElementById("pctFill").style.width = pct + "%";
+  document.getElementById("pctText").textContent = pct + "%";
+  for(const c of CHAPTERS){
+    const nb = document.getElementById("nav-" + c.id);
+    if(nb) nb.classList.toggle("done", done.has(c.id));
+  }
+}
+
+function render(id, sub){
+  if(!C[id]) id = "home";
+  current = id;
+  content.innerHTML = C[id]();
+  // active nav
+  document.querySelectorAll(".nav-item").forEach(b => b.classList.toggle("active", b.dataset.go === id));
+  // reflect completion on complete-rows
+  document.querySelectorAll("[data-complete]").forEach(row => {
+    if(done.has(row.dataset.complete)) row.classList.add("is-done");
+  });
+  if(id === "lab") initLabs();
+  // scroll
+  if(sub){
+    const t = document.getElementById(sub);
+    if(t){ t.scrollIntoView({behavior:"smooth", block:"start"}); }
+  } else {
+    content.scrollIntoView({block:"start"});
+    window.scrollTo(0,0);
+  }
+  // hash (bare token only)
+  try { history.replaceState(null,"", "#"+id); } catch {}
+}
+
+/* navigation + global clicks (delegated) */
+document.addEventListener("click", (e) => {
+  const go = e.target.closest("[data-go]");
+  if(go){ render(go.dataset.go, go.dataset.sub); closeRail(); return; }
+
+  const copyBtn = e.target.closest(".copy-btn, [data-copy]");
+  if(copyBtn && copyBtn.dataset.copy !== undefined){ doCopy(copyBtn); return; }
+
+  const opt = e.target.closest(".quiz .opt");
+  if(opt){ handleQuiz(opt); return; }
+
+  const cbtn = e.target.closest(".complete-btn");
+  if(cbtn){ handleComplete(cbtn); return; }
+});
+
+function doCopy(btn){
+  const text = btn.dataset.copy
+    .replace(/&quot;/g,'"').replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&#39;/g,"'");
+  const label = btn.textContent;
+  const ok = () => { btn.textContent = "Copied ✓"; setTimeout(()=>btn.textContent=label, 1400); };
+  try {
+    navigator.clipboard.writeText(text).then(ok).catch(()=>fallbackCopy(text, ok));
+  } catch { fallbackCopy(text, ok); }
+}
+function fallbackCopy(text, ok){
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); document.body.removeChild(ta); ok();
+  } catch {}
+}
+
+function handleQuiz(opt){
+  const quiz = opt.closest(".quiz");
+  if(quiz.dataset.locked) return;
+  const correct = quiz.dataset.answer;
+  const chosen = opt.dataset.opt;
+  quiz.dataset.locked = "1";
+  quiz.querySelectorAll(".opt").forEach(o => {
+    if(o.dataset.opt === correct) o.classList.add("correct");
+    if(o === opt && chosen !== correct) o.classList.add("wrong");
+  });
+  quiz.querySelector(".fb").classList.add("show");
+}
+
+function handleComplete(btn){
+  const row = btn.closest("[data-complete]");
+  const ch = row.dataset.complete;
+  done.add(ch); saveDone(done);
+  row.classList.add("is-done");
+  updateProgress();
+}
+
+/* ---------- mobile rail ---------- */
+const rail = document.getElementById("rail");
+const scrim = document.getElementById("scrim");
+document.getElementById("menuBtn").addEventListener("click", () => {
+  rail.classList.add("open"); scrim.classList.add("open");
+});
+function closeRail(){ rail.classList.remove("open"); scrim.classList.remove("open"); }
+scrim.addEventListener("click", closeRail);
+
+/* ---------- theme toggle ---------- */
+(function initTheme(){
+  let t = null;
+  try { t = localStorage.getItem(TKEY); } catch {}
+  if(t === "dark" || t === "light") document.documentElement.setAttribute("data-theme", t);
+  document.getElementById("themeBtn").addEventListener("click", () => {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = cur ? cur === "dark"
+      : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = dark ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(TKEY, next); } catch {}
+  });
+})();
+
+/* ============================================================
+   LAB ENGINES  (deterministic, no eval, no network)
+   ============================================================ */
+
+/* ---- SQLi: a tiny boolean-expression evaluator over a user table ---- */
+const SQLI_USERS = [
+  {username:"admin", password:"s3cr3t-admin"},
+  {username:"suba",  password:"correct-horse"},
+  {username:"guest", password:"guest"},
+];
+function sqliEval(expr, row){
+  // tokenize
+  const toks = []; let i = 0; const s = expr;
+  while(i < s.length){
+    const c = s[i];
+    if(c === " " || c === "\t" || c === "\n"){ i++; continue; }
+    if(c === "'"){ let j=i+1, v=""; while(j<s.length && s[j]!=="'"){ v+=s[j]; j++; } if(j>=s.length) throw new Error("unterminated string literal"); toks.push({t:"str", v}); i=j+1; continue; }
+    if(c === "("){ toks.push({t:"lp"}); i++; continue; }
+    if(c === ")"){ toks.push({t:"rp"}); i++; continue; }
+    if(c === "="){ toks.push({t:"eq"}); i++; continue; }
+    let j=i, w=""; while(j<s.length && /[A-Za-z0-9_.]/.test(s[j])){ w+=s[j]; j++; }
+    if(w === ""){ i++; continue; } // skip stray punctuation
+    const up = w.toUpperCase();
+    if(up === "AND") toks.push({t:"and"});
+    else if(up === "OR") toks.push({t:"or"});
+    else toks.push({t:"val", v:w}); // ident or number treated as value
+    i = j;
+  }
+  let p = 0;
+  const peek = () => toks[p];
+  const eat  = () => toks[p++];
+  function operand(){
+    const tk = peek();
+    if(!tk) throw new Error("unexpected end of expression");
+    if(tk.t === "str"){ eat(); return tk.v; }
+    if(tk.t === "val"){ eat(); const k = tk.v.toLowerCase(); return (k in row) ? String(row[k]) : tk.v; }
+    throw new Error("expected a value");
+  }
+  function cond(){
+    if(peek() && peek().t === "lp"){ eat(); const v = orExpr(); if(peek() && peek().t === "rp") eat(); return v; }
+    const left = operand();
+    if(peek() && peek().t === "eq"){ eat(); const right = operand(); return left === right; }
+    return left !== "" && left !== "0";
+  }
+  function andExpr(){ let v = cond(); while(peek() && peek().t === "and"){ eat(); v = cond() && v; } return v; }
+  function orExpr(){ let v = andExpr(); while(peek() && peek().t === "or"){ eat(); v = andExpr() || v; } return v; }
+  const r = orExpr();
+  if(p < toks.length) { /* trailing tokens ignored */ }
+  return r;
+}
+function runSqli(){
+  const user = document.getElementById("sqli-user").value;
+  const pass = document.getElementById("sqli-pass").value;
+  const secure = document.getElementById("sqli-secure").checked;
+  const qEl = document.getElementById("sqli-query");
+  const vEl = document.getElementById("sqli-verdict");
+  const template = `SELECT * FROM users WHERE username = '${user}' AND password = '${pass}'`;
+
+  vEl.className = "verdict show";
+
+  if(secure){
+    const hit = SQLI_USERS.find(r => r.username === user && r.password === pass);
+    qEl.innerHTML = `<span class="key">prepared</span> SELECT * FROM users WHERE username = <span class="pay">?</span> AND password = <span class="pay">?</span>\n<span class="dim">params =</span> [${JSON.stringify(user)}, ${JSON.stringify(pass)}]\n<span class="dim">— input bound as data; it can never become SQL —</span>`;
+    if(hit){
+      vEl.className = "verdict show safe";
+      vEl.innerHTML = `✅ Logged in as <b>${esc(hit.username)}</b> — because the credentials are actually correct. Injection payloads here are treated as a literal (wrong) password and bounce off.`;
+    } else {
+      vEl.className = "verdict show safe";
+      vEl.innerHTML = `🔒 Login failed — injection neutralized. The quote in your input stayed <i>inside</i> the password value instead of breaking out into the query. This is the fix.`;
+    }
+    return;
+  }
+
+  // vulnerable path: substitute, strip comments, evaluate
+  let where = template.slice(template.indexOf("WHERE") + 5);
+  let cut = where.length;
+  const dd = where.indexOf("--"); if(dd >= 0) cut = Math.min(cut, dd);
+  const hh = where.indexOf("#");  if(hh >= 0) cut = Math.min(cut, hh);
+  const trimmed = where.slice(0, cut);
+  const commented = where.slice(cut);
+
+  // pretty-print the query with payload highlighting
+  let shown = `SELECT * FROM users WHERE${highlightWhere(trimmed)}`;
+  if(commented.trim()) shown += `<span class="dim">${esc(commented)}</span>`;
+  qEl.innerHTML = shown;
+
+  let matched = null, err = null;
+  try {
+    for(const r of SQLI_USERS){ if(sqliEval(trimmed, r)){ matched = r; break; } }
+  } catch(e){ err = e.message; }
+
+  if(err){
+    vEl.className = "verdict show breached";
+    vEl.innerHTML = `💥 <b>HTTP 500 — SQL error:</b> <code>${esc(err)}</code>. The app leaked a database error, which confirms your input reaches the query raw. That error message is itself a finding — and the green light to craft a real injection.`;
+  } else if(matched){
+    vEl.className = "verdict show breached";
+    const injected = (document.getElementById("sqli-pass").value + document.getElementById("sqli-user").value).match(/('|--|\bor\b)/i);
+    vEl.innerHTML = `🚨 <b>Authenticated as ${esc(matched.username)}</b> ${injected ? "without a valid password" : ""}. ${matched.username==="admin" ? "You logged in as the first row in the table — the admin." : ""} The <code>WHERE</code> clause resolved to true, so the database returned a user. <b>That's a login bypass.</b>`;
+  } else {
+    vEl.className = "verdict show neutral";
+    vEl.innerHTML = `❌ Invalid credentials — the <code>WHERE</code> clause matched no rows. Try one of the payload chips to make it always-true.`;
+  }
+}
+function highlightWhere(w){
+  // escape then color string literals and injection hints
+  let out = esc(w);
+  out = out.replace(/(&#39;[^&]*?&#39;|'[^']*?')/g, m => `<span class="pay">${m}</span>`);
+  out = out.replace(/\b(OR|AND)\b/g, m => `<span class="key">${m}</span>`);
+  return out;
+}
+
+/* ---- IDOR ---- */
+const ORDERS = {
+  "1000": {owner:"mira",  item:"Mechanical keyboard", total:"$119.00", address:"Palo Alto, CA"},
+  "1001": {owner:"devan", item:"Noise-cancelling headphones", total:"$299.00", address:"Austin, TX"},
+  "1002": {owner:"suba",  item:"USB-C hub + cable kit", total:"$54.00", address:"Sunnyvale, CA"},
+  "1003": {owner:"priya", item:"Standing desk converter", total:"$220.00", address:"Seattle, WA"},
+};
+const SESSION_USER = "suba";
+function runIdor(){
+  const id = document.getElementById("idor-id").value.trim();
+  const secure = document.getElementById("idor-secure").checked;
+  const out = document.getElementById("idor-out");
+  const vEl = document.getElementById("idor-verdict");
+  vEl.className = "verdict show";
+  const rec = ORDERS[id];
+
+  const reqLine = `<span class="dim">→</span> <span class="key">GET</span> /api/orders/${esc(id)}\n<span class="dim">   Authorization: Bearer &lt;${SESSION_USER}'s token&gt;</span>\n\n`;
+
+  if(!rec){
+    out.innerHTML = reqLine + `<span class="bad">HTTP 404 Not Found</span>\n{ "error": "no such order" }`;
+    vEl.className = "verdict show neutral";
+    vEl.innerHTML = `No order with that ID. Try 1000–1003.`;
+    return;
+  }
+  if(secure && rec.owner !== SESSION_USER){
+    out.innerHTML = reqLine + `<span class="ok">HTTP 403 Forbidden</span>\n{ "error": "you do not own this resource" }`;
+    vEl.className = "verdict show safe";
+    vEl.innerHTML = `🔒 <b>403 — fixed.</b> The server checked that <b>${SESSION_USER}</b> owns order ${esc(id)}, saw it belongs to <b>${esc(rec.owner)}</b>, and refused. This is correct access control.`;
+    return;
+  }
+  // return the record
+  out.innerHTML = reqLine + `<span class="${rec.owner===SESSION_USER?"ok":"bad"}">HTTP 200 OK</span>\n{\n  <span class="key">"order_id"</span>: "${esc(id)}",\n  <span class="key">"owner"</span>: "${esc(rec.owner)}",\n  <span class="key">"item"</span>: "${esc(rec.item)}",\n  <span class="key">"total"</span>: "${esc(rec.total)}",\n  <span class="key">"ship_to"</span>: "${esc(rec.address)}"\n}`;
+  if(rec.owner === SESSION_USER){
+    vEl.className = "verdict show neutral";
+    vEl.innerHTML = `✓ That's your own order (${SESSION_USER}). Now change the ID to one you <i>don't</i> own and send again.`;
+  } else {
+    vEl.className = "verdict show breached";
+    vEl.innerHTML = `🚨 <b>IDOR confirmed.</b> You're logged in as <b>${SESSION_USER}</b> but just read <b>${esc(rec.owner)}</b>'s order — name, items, shipping address. No ownership check ran. Flip on "ownership check" to see the fix.`;
+  }
+}
+
+/* ---- XSS (safe simulation — never injects into the DOM) ---- */
+function runXss(){
+  const raw = document.getElementById("xss-in").value;
+  const secure = document.getElementById("xss-secure").checked;
+  const out = document.getElementById("xss-out");
+  const vEl = document.getElementById("xss-verdict");
+  vEl.className = "verdict show";
+
+  const emitted = secure ? esc(raw) : raw; // what the server writes into the page source
+  // display: always escape for safe viewing in our terminal box
+  out.innerHTML = `<span class="dim">&lt;div class="results"&gt;</span>\n  <span class="dim">You searched for:</span> ${colorEmitted(emitted, secure)}\n<span class="dim">&lt;/div&gt;</span>`;
+
+  const executes = !secure && wouldExecute(raw);
+  if(secure){
+    const hadTags = /[<>]/.test(raw);
+    vEl.className = "verdict show safe";
+    vEl.innerHTML = hadTags
+      ? `🔒 <b>Escaped — inert.</b> Your <code>&lt;</code> and <code>&gt;</code> were written as <code>&amp;lt;</code> / <code>&amp;gt;</code>, so the browser shows them as <i>text</i>, not tags. Nothing executes. This is contextual output encoding — the fix.`
+      : `🔒 Output is escaped. Even if you add tags, they'll be neutralized. Try a payload chip with escaping on, then off.`;
+  } else if(executes){
+    vEl.className = "verdict show breached";
+    vEl.innerHTML = `🚨 <b>XSS confirmed.</b> The server wrote your payload into the page unescaped, so the browser would parse and run it — firing in the victim's session. <span class="dim">(Simulated: no script actually ran here.)</span> This is how session cookies get stolen.`;
+  } else {
+    const hadTags = /[<>]/.test(raw);
+    vEl.className = "verdict show neutral";
+    vEl.innerHTML = hadTags
+      ? `⚠️ Your input was reflected raw (a <code>&lt;b&gt;</code> probe would render as real bold — the page isn't escaping). Escalate to an event-handler payload like <code>&lt;img src=x onerror=…&gt;</code> to prove script execution.`
+      : `Reflected as plain text. Add a tag to probe whether the page escapes output — try the <code>&lt;b&gt;probe&lt;/b&gt;</code> chip.`;
+  }
+}
+function wouldExecute(s){
+  return /<\s*script/i.test(s)
+      || /on\w+\s*=/i.test(s)                 // event handlers: onerror, onload...
+      || /<\s*(img|svg|iframe|body|video|audio|details|object|embed)[^>]*\bon\w+/i.test(s)
+      || /javascript\s*:/i.test(s);
+}
+function colorEmitted(emitted, secure){
+  if(secure) return `<span class="ok">${emitted}</span>`; // already escaped text
+  // emitted is raw; show it escaped-for-display but tinted as "live markup"
+  return `<span class="pay">${esc(emitted)}</span>`;
+}
+
+/* ---- JWT ---- */
+function b64urlEncode(obj){
+  const json = JSON.stringify(obj);
+  return btoa(json).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function b64urlDecode(str){
+  try {
+    let s = str.replace(/-/g,"+").replace(/_/g,"/");
+    while(s.length % 4) s += "=";
+    return JSON.parse(atob(s));
+  } catch { return null; }
+}
+const JWT_SECRET_SIG = "VALIDSIG-server-signed-xyz"; // stand-in for an HMAC signature
+function makeDemoJwt(role){
+  const header = {alg:"HS256", typ:"JWT"};
+  const payload = {sub:"suba", role: role || "user", iat: 1730000000};
+  return `${b64urlEncode(header)}.${b64urlEncode(payload)}.${JWT_SECRET_SIG}`;
+}
+function setJwtRole(role){
+  const el = document.getElementById("jwt-in");
+  const parts = el.value.split(".");
+  const payload = (parts.length===3 && b64urlDecode(parts[1])) || {sub:"suba", iat:1730000000};
+  payload.role = role;
+  // forging the payload but keeping the OLD signature (attacker can't recompute it)
+  el.value = `${parts[0]||b64urlEncode({alg:"HS256",typ:"JWT"})}.${b64urlEncode(payload)}.${parts[2]||JWT_SECRET_SIG}`;
+  runJwt();
+}
+function runJwt(){
+  const el = document.getElementById("jwt-in");
+  const verify = document.getElementById("jwt-secure").checked;
+  const out = document.getElementById("jwt-out");
+  const vEl = document.getElementById("jwt-verdict");
+  vEl.className = "verdict show";
+  const parts = el.value.split(".");
+  if(parts.length !== 3){
+    out.innerHTML = `<span class="bad">Not a valid JWT (need header.payload.signature).</span>`;
+    vEl.className = "verdict show neutral";
+    vEl.innerHTML = `A JWT has three dot-separated parts. Use a role chip to generate one.`;
+    return;
+  }
+  const header = b64urlDecode(parts[0]);
+  const payload = b64urlDecode(parts[1]);
+  if(!header || !payload){
+    out.innerHTML = `<span class="bad">Could not decode the token.</span>`;
+    vEl.className = "verdict show neutral"; vEl.innerHTML = "Decode failed — regenerate with a role chip.";
+    return;
+  }
+  out.innerHTML =
+    `<span class="dim">// header (Base64 — anyone can read this)</span>\n<span class="key">${esc(JSON.stringify(header,null,2))}</span>\n\n` +
+    `<span class="dim">// payload (Base64 — NOT encrypted)</span>\n<span class="pay">${esc(JSON.stringify(payload,null,2))}</span>\n\n` +
+    `<span class="dim">// signature</span>\n${esc(parts[2])}`;
+
+  const sigValid = parts[2] === JWT_SECRET_SIG;
+  const roleAdmin = payload.role === "admin";
+
+  if(verify){
+    if(sigValid){
+      vEl.className = "verdict show safe";
+      vEl.innerHTML = `🔒 <b>Signature valid.</b> The server recomputed the signature over the payload and it matched, so it trusts <code>role=${esc(String(payload.role))}</code>. You can <i>read</i> the token, but any change would invalidate this signature.`;
+    } else {
+      vEl.className = "verdict show safe";
+      vEl.innerHTML = `🔒 <b>Rejected — HTTP 401.</b> You changed the payload${roleAdmin?" to <code>role=admin</code>":""}, but you can't recompute the signature without the server's secret key. The server recomputed it, saw the mismatch, and threw out your forged token. <b>This is why signing works.</b>`;
+    }
+  } else {
+    if(roleAdmin && !sigValid){
+      vEl.className = "verdict show breached";
+      vEl.innerHTML = `🚨 <b>Privilege escalation.</b> Signature verification is off, so the server trusted your edited payload — you're now <code>role=admin</code> with a forged token. This is the real-world "alg:none / unverified signature" bug.`;
+    } else {
+      vEl.className = "verdict show breached";
+      vEl.innerHTML = `⚠️ Signature not verified — the server trusts whatever the payload says (<code>role=${esc(String(payload.role))}</code>). Set the role to <b>admin</b> to escalate, since nothing checks the signature.`;
+    }
+  }
+}
+
+/* lab init + handlers */
+function initLabs(){
+  // SQLi
+  document.getElementById("sqli-go").onclick = runSqli;
+  document.getElementById("sqli-secure").onchange = runSqli;
+  document.querySelectorAll("[data-sqli]").forEach(b => b.onclick = () => {
+    document.getElementById("sqli-pass").value = b.dataset.sqli;
+    if(b.dataset.sqli === "admin'--") document.getElementById("sqli-user").value = b.dataset.sqli;
+    runSqli();
+  });
+  // IDOR
+  document.getElementById("idor-go").onclick = runIdor;
+  document.getElementById("idor-secure").onchange = runIdor;
+  document.querySelectorAll("[data-idor]").forEach(b => b.onclick = () => {
+    document.getElementById("idor-id").value = b.dataset.idor; runIdor();
+  });
+  // XSS
+  document.getElementById("xss-go").onclick = runXss;
+  document.getElementById("xss-secure").onchange = runXss;
+  document.querySelectorAll("[data-xss]").forEach(b => b.onclick = () => {
+    document.getElementById("xss-in").value = b.dataset.xss
+      .replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&amp;/g,"&");
+    runXss();
+  });
+  // JWT
+  document.getElementById("jwt-in").value = makeDemoJwt("user");
+  document.getElementById("jwt-go").onclick = runJwt;
+  document.getElementById("jwt-secure").onchange = runJwt;
+  document.querySelectorAll("[data-jwt-role]").forEach(b => b.onclick = () => setJwtRole(b.dataset.jwtRole));
+}
+
+/* ---------- boot ---------- */
+buildNav();
+updateProgress();
+let start = "home";
+try {
+  const h = (location.hash || "").replace(/^#/, "");
+  if(h && (C[h])) start = h;
+} catch {}
+render(start);
+</script>
