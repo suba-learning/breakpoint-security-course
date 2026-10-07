@@ -2,8 +2,7 @@
 
 An interactive, browser-based course that teaches web application security testing from scratch: ten chapters with four **live, in-browser vulnerability labs**. No install, no backend, no setup — one self-contained HTML file.
 
-**▶ Live site:** `https://<your-username>.github.io/breakpoint-security-course/`
-_(update this link once GitHub Pages is enabled)_
+**▶ Live site:** `[https://<your-username>.github.io/breakpoint-security-course/](https://suba-learning.github.io/breakpoint-security-course/)`
 
 ---
 
